@@ -25,22 +25,28 @@ export default function Home() {
 };
 
   useEffect(() => {
-    const loadData = async () => {
-      await fetchSubscriptions();
-    };
+  const checkUser = async () => {
+    const { data } = await supabase.auth.getUser();
 
-    loadData();
-  }, []);
+    if (!data.user) {
+      window.location.href = "/login";
+    }
+  };
+
+  checkUser();
+}, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const { data: userData } = await supabase.auth.getUser();
     const { data, error } = await supabase.from("subscriptions").insert([
       {
         name,
         price: Number(price),
         billing_cycle: billingCycle,
         renewal_date: renewalDate,
+        user_id: userData.user?.id,
       },
     ]);
 
@@ -105,6 +111,11 @@ const getRemainingDays = (sub: any) => {
   );
 }, 0);
 
+  const handleLogout = async () => {
+  await supabase.auth.signOut();
+  window.location.href = "/login";
+};
+
   return (
   <div className="min-h-screen bg-gray-50 flex justify-center">
     <div className="w-full max-w-xl px-8 py-16">
@@ -112,6 +123,13 @@ const getRemainingDays = (sub: any) => {
       <h1 className="text-lg font-medium tracking-tight text-gray-900">
         Subscriptions
       </h1>
+
+      <button
+  onClick={handleLogout}
+  className="text-xs text-gray-400 hover:text-black"
+>
+  Logout
+</button>
 
       {/* フォーム */}
       <form onSubmit={handleSubmit} className="space-y-4 mb-12">

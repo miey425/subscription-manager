@@ -11,11 +11,16 @@ export default function Home() {
   const [renewalDate, setRenewalDate] = useState("");
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
-  const fetchSubscriptions = async (userId: string) => {
+  const fetchSubscriptions = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
   const { data, error } = await supabase
     .from("subscriptions")
     .select("*")
-    .eq("user_id", userId);
+    .eq("user_id", user.id);
 
   if (!error && data) {
     setSubscriptions(data);
@@ -29,7 +34,7 @@ export default function Home() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      fetchSubscriptions(user.id);
+      fetchSubscriptions();
     }
   };
 

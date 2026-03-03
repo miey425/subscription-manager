@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence, number } from "framer-motion";
+import { fdatasync } from "fs";
 
 export default function Home() {
   const [name, setName] = useState("");
@@ -176,7 +177,7 @@ export default function Home() {
 
             <input
               type="date"
-              value={renewalDate}
+              value={"日付" + renewalDate}
               onChange={(e) => setRenewalDate(e.target.value)}
               className="border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
               required

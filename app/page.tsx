@@ -11,18 +11,30 @@ export default function Home() {
   const [renewalDate, setRenewalDate] = useState("");
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
-  const fetchSubscriptions = async () => {
-    const { data, error } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .order("created_at", { ascending: false });
+  const fetchSubscriptions = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userId);
 
-    if (error) {
-      console.error(error);
-    } else {
-      setSubscriptions(data);
+  if (!error && data) {
+    setSubscriptions(data);
+  }
+};
+
+  useEffect(() => {
+  const getUserAndFetch = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      fetchSubscriptions(user.id);
     }
   };
+
+  getUserAndFetch();
+}, []);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -40,7 +52,7 @@ export default function Home() {
     e.preventDefault();
 
     const { data: userData } = await supabase.auth.getUser();
-    const { data, error } = await supabase.from("subscriptions").insert([
+    const { error } = await supabase.from("subscriptions").insert([
       {
         name,
         price: Number(price),

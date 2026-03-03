@@ -14,9 +14,10 @@ export default function LoginPage() {
     });
 
     if (error) {
-      alert("ログイン失敗");
+        console.error(error);
+        alert(error.message);
     } else {
-      window.location.href = "/";
+        window.location.href = "/";
     }
   };
 
@@ -27,8 +28,9 @@ export default function LoginPage() {
     });
 
     if (error) {
-      alert("登録失敗");
-    } else {
+  console.error("Signup error:", error.message);
+  alert(error.message);
+} else {
       alert("確認メールを送信しました");
     }
   };
@@ -55,8 +57,8 @@ export default function LoginPage() {
         />
 
         <button
-          onClick={handleLogin}
-          className="text-sm text-gray-600 hover:text-black"
+        onClick={handleLogin}
+        className="text-sm text-gray-600 hover:text-black"
         >
           Login
         </button>

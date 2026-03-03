@@ -177,7 +177,7 @@ export default function Home() {
 
             <input
               type="date"
-              value={"日付" + renewalDate}
+              value={renewalDate}
               onChange={(e) => setRenewalDate(e.target.value)}
               className="border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
               required

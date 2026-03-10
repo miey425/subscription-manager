@@ -1,4 +1,4 @@
-# Subscription Manager 「サブマネ」
+# Subscription Manager <br>「サブマネ」
 
 サブスクリプションを管理し、年間の金額を視覚的に確認するWebアプリ。
 

@@ -119,9 +119,13 @@ export default function Home() {
     return diffDays;
   };
 
-  const yearlyTotal = subscriptions.reduce((sum, sub) => {
-    const price = Number(sub.price);
+  const monthlyTotal = subscriptions.reduce((sum, sub) => {
+    const price = Number(sub.price) || 0;
+    return sum + (sub.billing_cycle === "yearly" ? price / 12 : price);
+  }, 0);
 
+  const yearlyTotal = subscriptions.reduce((sum, sub) => {
+    const price = Number(sub.price) || 0;
     return sum + (sub.billing_cycle === "monthly" ? price * 12 : price);
   }, 0);
 
@@ -189,18 +193,31 @@ export default function Home() {
             type="submit"
             className="text-sm text-gray-600 hover:text-black transition"
           >
-            + Add
+            + Add Subscription
           </motion.button>
         </form>
 
-        {/* 年間合計 */}
-        <div className="mb-10">
-          <div className="text-xs text-gray-400 mb-1">Yearly total</div>
-          <div
-            className="text-2xl font-semibold tracking-tight
-                transition-all duration-300"
-          >
-            ¥{yearlyTotal.toLocaleString()}
+        <div className="mb-10 space-y-5 w-full max-w-xs mx-auto">
+          {/* 月額合計 */}
+          <div className="flex items-baseline justify-between gap-4">
+            <div className="text-sm text-gray-600">Monthly total</div>
+            <div
+              className="text-2xl font-semibold tracking-tight
+                  transition-all duration-300"
+            >
+              ¥{Math.round(monthlyTotal).toLocaleString()}
+            </div>
+          </div>
+
+          {/* 年間合計 */}
+          <div className="flex items-baseline justify-between gap-4">
+            <div className="text-sm text-gray-600">Yearly total</div>
+            <div
+              className="text-2xl font-semibold tracking-tight
+                  transition-all duration-300"
+            >
+              ¥{yearlyTotal.toLocaleString()}
+            </div>
           </div>
         </div>
 

@@ -28,31 +28,27 @@ export default function Home() {
   }
 };
 
-  useEffect(() => {
-  const getUserAndFetch = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+const [loading, setLoading] = useState(true);
 
-    if (user) {
-      fetchSubscriptions();
+useEffect(() => {
+  const init = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      window.location.href = "/login";
+      return;
     }
+
+    await fetchSubscriptions();
+    setLoading(false);
   };
 
-  getUserAndFetch();
+  init();
 }, []);
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
-
-      if (!data.user) {
-        window.location.href = "/login";
-      }
-    };
-
-    checkUser();
-  }, []);
+if (loading) {
+  return <div>Loading...</div>;
+}
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +66,7 @@ export default function Home() {
 
     if (error) {
       console.error(error);
-      alert("エラーが発生しました");
+      alert("Failed to add subscription");
     } else {
       setName("");
       setPrice("");

@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { motion, AnimatePresence, number } from "framer-motion";
-import { fdatasync } from "fs";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Subscription {
   id: string;
@@ -18,7 +17,7 @@ export default function Home() {
   const [price, setPrice] = useState("");
   const [billingCycle, setBillingCycle] = useState("monthly");
   const [renewalDate, setRenewalDate] = useState("");
-  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
   const fetchSubscriptions = async () => {
     const {
@@ -98,6 +97,26 @@ export default function Home() {
     }
   };
 
+  const handleUpgrade = async () => {
+    const res = await fetch("/api/create-checkout-session", {
+      method: "POST",
+    });
+  
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("API error", res.status, text);
+      return;
+    }
+  
+    const data = await res.json();
+    if (!data?.url) {
+      console.error("Missing checkout url", data);
+      return;
+    }
+
+    window.location.href = data.url;
+  };
+
   const getNextRenewalDate = (sub: Subscription) => {
     const today = new Date();
     const renewal = new Date(sub.renewal_date);
@@ -151,6 +170,10 @@ export default function Home() {
           className="text-xs text-gray-400 hover:text-black"
         >
           Logout
+        </button>
+
+        <button onClick={handleUpgrade}>
+          ⭐ Upgrade to Pro ($200/month)
         </button>
 
         {/* フォーム */}

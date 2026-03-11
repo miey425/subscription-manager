@@ -5,6 +5,14 @@ import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence, number } from "framer-motion";
 import { fdatasync } from "fs";
 
+interface Subscription {
+  id: string;
+  name: string;
+  price: number;
+  billing_cycle: "monthly" | "yearly";
+  renewal_date: string;
+}
+
 export default function Home() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -90,9 +98,9 @@ if (loading) {
     }
   };
 
-  const getNextRenewalDate = (sub: any) => {
+  const getNextRenewalDate = (sub: Subscription) => {
     const today = new Date();
-    let renewal = new Date(sub.renewal_date);
+    const renewal = new Date(sub.renewal_date);
 
     while (renewal < today) {
       if (sub.billing_cycle === "monthly") {
@@ -105,7 +113,7 @@ if (loading) {
     return renewal;
   };
 
-  const getRemainingDays = (sub: any) => {
+  const getRemainingDays = (sub: Subscription) => {
     const today = new Date();
     const nextRenewal = getNextRenewalDate(sub);
 
@@ -177,6 +185,7 @@ if (loading) {
 
             <input
               type="date"
+              placeholder="Payment date"
               value={renewalDate}
               onChange={(e) => setRenewalDate(e.target.value)}
               className="border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"

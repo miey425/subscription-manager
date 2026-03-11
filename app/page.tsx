@@ -21,42 +21,42 @@ export default function Home() {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
   const fetchSubscriptions = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-  const { data, error } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("user_id", user.id);
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id);
 
-  if (!error && data) {
-    setSubscriptions(data);
-  }
-};
-
-const [loading, setLoading] = useState(true);
-
-useEffect(() => {
-  const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      window.location.href = "/login";
-      return;
+    if (!error && data) {
+      setSubscriptions(data);
     }
-
-    await fetchSubscriptions();
-    setLoading(false);
   };
 
-  init();
-}, []);
+  const [loading, setLoading] = useState(true);
 
-if (loading) {
-  return <div>Loading...</div>;
-}
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      await fetchSubscriptions();
+      setLoading(false);
+    };
+
+    init();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,14 +183,19 @@ if (loading) {
               <option value="yearly">Yearly</option>
             </select>
 
-            <input
-              type="date"
-              placeholder="Payment date"
-              value={renewalDate}
-              onChange={(e) => setRenewalDate(e.target.value)}
-              className="border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
-              required
-            />
+            <div className="flex flex-col">
+              <label className="text-sm text-gray-500">
+                Payment Date
+              </label>
+
+              <input
+                type="date"
+                value={renewalDate}
+                onChange={(e) => setRenewalDate(e.target.value)}
+                className="w-full border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
+                required
+              />
+            </div>
           </div>
 
           <motion.button

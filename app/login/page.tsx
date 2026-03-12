@@ -8,29 +8,45 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-        console.error(error);
-        alert(error.message);
+      console.error(error);
+      alert(error.message);
     } else {
-        window.location.href = "/";
+      const user = data.user;
+      if (user) {
+        await supabase.from("users").upsert({
+          id: user.id,
+          email: user.email,
+        });
+      }
+
+      window.location.href = "/";
     }
   };
 
   const handleSignup = async () => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
-  console.error("Signup error:", error.message);
-  alert(error.message);
-} else {
+      console.error("Signup error:", error.message);
+      alert(error.message);
+    } else {
+      const user = data.user;
+      if (user) {
+        await supabase.from("users").upsert({
+          id: user.id,
+          email: user.email,
+        });
+      }
+
       alert("確認メールを送信しました");
     }
   };

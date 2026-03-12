@@ -98,8 +98,14 @@ export default function Home() {
   };
 
   const handleUpgrade = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const res = await fetch("/api/create-checkout-session", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user?.id ?? null }),
     });
   
     if (!res.ok) {

@@ -10,7 +10,7 @@ if (!stripeSecretKey) {
 
 const stripe = new Stripe(stripeSecretKey);
 
-export async function POST() {
+export async function POST(req: Request) {
   if (!priceId) {
     return Response.json(
       { error: "Missing STRIPE_PRICE_ID env var (expected a 'price_' id)" },
@@ -34,6 +34,9 @@ export async function POST() {
     process.env.NEXT_PUBLIC_APP_URL ??
     "http://localhost:3000";
 
+  const body = await req.json().catch(() => null);
+  const userId = body && typeof body.userId === "string" ? body.userId : null;
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -45,6 +48,7 @@ export async function POST() {
       ],
       success_url: `${origin}/success`,
       cancel_url: `${origin}/cancel`,
+      ...(userId ? { metadata: { user_id: userId } } : {}),
     });
 
     return Response.json({ url: session.url });

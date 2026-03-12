@@ -2,17 +2,24 @@ import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+export const runtime = "nodejs";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing ${name} env var`);
+  return value;
+}
 
 export async function POST(req: NextRequest) {
+  const stripe = new Stripe(requireEnv("STRIPE_SECRET_KEY"));
+  const supabase = createClient(
+    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY")
+  );
 
   const body = await req.text();
-  const sig = req.headers.get("stripe-signature")!;
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) return new NextResponse("Missing stripe-signature header", { status: 400 });
 
   let event;
 
@@ -20,9 +27,9 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      requireEnv("STRIPE_WEBHOOK_SECRET")
     );
-  } catch (err) {
+  } catch {
     return new NextResponse("Webhook Error", { status: 400 });
   }
 

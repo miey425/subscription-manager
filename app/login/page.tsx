@@ -19,10 +19,15 @@ export default function LoginPage() {
     } else {
       const user = data.user;
       if (user) {
-        await supabase.from("users").upsert({
-          id: user.id,
-          email: user.email,
-        });
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+
+        if (accessToken) {
+          await fetch("/api/ensure-user", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+        }
       }
 
       window.location.href = "/";
@@ -41,10 +46,15 @@ export default function LoginPage() {
     } else {
       const user = data.user;
       if (user) {
-        await supabase.from("users").upsert({
-          id: user.id,
-          email: user.email,
-        });
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+
+        if (accessToken) {
+          await fetch("/api/ensure-user", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+        }
       }
 
       alert("確認メールを送信しました");

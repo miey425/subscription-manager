@@ -18,6 +18,7 @@ export default function Home() {
   const [billingCycle, setBillingCycle] = useState("monthly");
   const [renewalDate, setRenewalDate] = useState("");
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [isPro, setIsPro] = useState<boolean | null>(null);
 
   const fetchSubscriptions = async () => {
     const {
@@ -46,6 +47,25 @@ export default function Home() {
         return;
       }
 
+      // Ensure users row exists (bypasses RLS via server route)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (accessToken) {
+        await fetch("/api/ensure-user", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      }
+
+      const { data } = await supabase
+        .from("users")
+        .select("is_pro")
+        .eq("id", user.id)
+        .single();
+
+      const isPro = data?.is_pro;
+      setIsPro(Boolean(isPro));
+
       await fetchSubscriptions();
       setLoading(false);
     };
@@ -57,8 +77,17 @@ export default function Home() {
     return <div>Loading...</div>;
   }
 
+  const canAddSubscription = Boolean(isPro) || subscriptions.length < 3;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canAddSubscription) {
+      alert(
+        "無料プランではサブスクリプションは3件まで登録できます。Proにアップグレードすると無制限に登録できます。"
+      );
+      return;
+    }
 
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase.from("subscriptions").insert([
@@ -178,9 +207,13 @@ export default function Home() {
           Logout
         </button>
 
-        <button onClick={handleUpgrade}>
-          ⭐ Upgrade to Pro ($200/month)
-        </button>
+        {isPro ? (
+          <div className="text-sm text-gray-600">⭐ Pro</div>
+        ) : (
+          <button onClick={handleUpgrade}>
+            ⭐ Upgrade to Pro ($200/month)
+          </button>
+        )}
 
         {/* フォーム */}
         <form onSubmit={handleSubmit} className="space-y-4 mb-12">
@@ -230,10 +263,21 @@ export default function Home() {
           <motion.button
             whileTap={{ scale: 0.95 }}
             type="submit"
-            className="text-sm text-gray-600 hover:text-black transition"
+            disabled={!canAddSubscription}
+            className={`text-sm transition ${
+              canAddSubscription
+                ? "text-gray-600 hover:text-black"
+                : "text-gray-300 cursor-not-allowed"
+            }`}
           >
             + Add Subscription
           </motion.button>
+
+          {!canAddSubscription ? (
+            <div className="text-xs text-gray-400">
+              無料プランは3件まで登録できます（現在 {subscriptions.length} 件）。
+            </div>
+          ) : null}
         </form>
 
         <div className="mb-10 space-y-5 w-full max-w-xs mx-auto">

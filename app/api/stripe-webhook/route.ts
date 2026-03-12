@@ -34,16 +34,24 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.type === "checkout.session.completed") {
-
     const session = event.data.object as Stripe.Checkout.Session;
 
     const userId = session.metadata?.user_id;
 
     if (userId) {
-      await supabase
+      const { error } = await supabase
         .from("users")
-        .update({ is_pro: true })
-        .eq("id", userId);
+        .upsert({ id: userId, is_pro: true }, { onConflict: "id" });
+
+      if (error) {
+        console.error("Failed to upsert users.is_pro", { userId, error });
+        return new NextResponse("Failed to update user", { status: 500 });
+      }
+    } else {
+      console.warn("Missing user_id in session.metadata", {
+        sessionId: session.id,
+        metadata: session.metadata,
+      });
     }
 
   }

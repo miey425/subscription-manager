@@ -9,58 +9,71 @@ const supabase = createClient(
 );
 
 export async function GET() {
+  try {
 
-  // ユーザー情報の取得
-  const { data: authData } = await supabase.auth.getUser();
-  const userId = authData?.user?.id;
-  console.log("userId:", userId);
+    const today = new Date();
+    const threeDaysLater = new Date(today);
+    threeDaysLater.setDate(today.getDate() + 3);
 
-  // 日付の計算
-  const today = new Date();
-  const threeDaysLater = new Date(today); // todayをコピーして作成
-  threeDaysLater.setDate(today.getDate() + 3);
+    // 有料ユーザーを全員取得
+    const { data: proUsers, error: proUsersError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("is_pro", true);
 
-  // usersテーブルから有料プランか確認
-  const { data: userRecord } = await supabase
-    .from("users")
-    .select("is_pro")
-    .eq("id", userId)
-    .single();
-  console.log("userRecord:", userRecord);
+    // ✅ エラーが起きたら内容をログに出す
+    if (proUsersError) {
+      console.error("proUsersエラー:", proUsersError);
+      return Response.json({ error: proUsersError.message }, { status: 500 });
+    }
 
-  if (!userRecord?.is_pro) {
-    console.log("無料プランなので通知しません");
-    return Response.json({ message: "Free plan, skipping notification" });
+    console.log("proUsers:", proUsers);
+
+    if (!proUsers || proUsers.length === 0) {
+      return Response.json({ message: "No pro users" });
+    }
+
+    const proUserIds = proUsers.map((u) => u.id);
+
+    const { data: subscriptions, error: subscriptionsError } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .lte("renewal_date", threeDaysLater.toISOString())
+      .eq("notified", false)
+      .in("user_id", proUserIds);
+
+    // ✅ エラーが起きたら内容をログに出す
+    if (subscriptionsError) {
+      console.error("subscriptionsエラー:", subscriptionsError);
+      return Response.json({ error: subscriptionsError.message }, { status: 500 });
+    }
+
+    console.log("subscriptions:", subscriptions);
+
+    if (!subscriptions || subscriptions.length === 0) {
+      return Response.json({ message: "No subscriptions" });
+    }
+
+    for (const sub of subscriptions) {
+      console.log("sending email:", sub.name);
+      await resend.emails.send({
+        from: "onboarding@resend.dev",
+        to: "satomiyabi0425@gmail.com",
+        subject: "サブスク更新通知",
+        html: `<p>${sub.name} の更新日が近いです</p>`
+      });
+    }
+
+    await supabase
+      .from("subscriptions")
+      .update({ notified: true })
+      .in("id", subscriptions.map((sub) => sub.id));
+
+    return Response.json({ success: true });
+
+  } catch (e) {
+    // ✅ 予期しないエラーもここでキャッチしてResponseを返す
+    console.error("予期しないエラー:", e);
+    return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
-
-  // 更新日が3日以内かつ未通知のサブスクを取得
-  const { data: subscriptions } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .lte("renewal_date", threeDaysLater.toISOString())
-    .eq("notified", false);
-
-  if (!subscriptions || subscriptions.length === 0) {
-    console.log("対象のサブスクリプションなし");
-    return Response.json({ message: "No subscriptions" });
-  }
-
-  // メール送信
-  for (const sub of subscriptions) {
-    console.log("sending email:", sub.name);
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: "satomiyabi0425@gmail.com",
-      subject: "サブスク更新通知",
-      html: `<p>${sub.name} の更新日が近いです</p>`
-    });
-  }
-
-  // まとめて通知済みに更新
-  await supabase
-    .from("subscriptions")
-    .update({ notified: true })
-    .in("id", subscriptions.map((sub) => sub.id));
-
-  return Response.json({ success: true });
 }

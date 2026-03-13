@@ -8,41 +8,50 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+
+    // ✅ リクエストのURLからuserIdを受け取る
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+    console.log("userId:", userId);
+
+    if (!userId) {
+      return Response.json({ error: "userId is required" }, { status: 400 });
+    }
 
     const today = new Date();
     const threeDaysLater = new Date(today);
     threeDaysLater.setDate(today.getDate() + 3);
 
-    // 有料ユーザーを全員取得
-    const { data: proUsers, error: proUsersError } = await supabase
+    // ✅ まず対象ユーザーが有料プランか確認
+    const { data: userRecord, error: userError } = await supabase
       .from("users")
-      .select("id")
-      .eq("is_pro", true);
+      .select("is_pro")
+      .eq("id", userId)
+      .single();
 
-    // ✅ エラーが起きたら内容をログに出す
-    if (proUsersError) {
-      console.error("proUsersエラー:", proUsersError);
-      return Response.json({ error: proUsersError.message }, { status: 500 });
+    if (userError) {
+      console.error("userエラー:", userError);
+      return Response.json({ error: userError.message }, { status: 500 });
     }
 
-    console.log("proUsers:", proUsers);
+    console.log("userRecord:", userRecord);
 
-    if (!proUsers || proUsers.length === 0) {
-      return Response.json({ message: "No pro users" });
+    // ✅ 無料プランならここで終了
+    if (!userRecord?.is_pro) {
+      console.log("無料プランなので通知しません");
+      return Response.json({ message: "Free plan, skipping notification" });
     }
 
-    const proUserIds = proUsers.map((u) => u.id);
-
+    // ✅ 有料プランの場合のみサブスクを検索
     const { data: subscriptions, error: subscriptionsError } = await supabase
       .from("subscriptions")
       .select("*")
       .lte("renewal_date", threeDaysLater.toISOString())
       .eq("notified", false)
-      .in("user_id", proUserIds);
+      .eq("user_id", userId); // ← 全員ではなく対象ユーザーだけ
 
-    // ✅ エラーが起きたら内容をログに出す
     if (subscriptionsError) {
       console.error("subscriptionsエラー:", subscriptionsError);
       return Response.json({ error: subscriptionsError.message }, { status: 500 });
@@ -51,7 +60,7 @@ export async function GET() {
     console.log("subscriptions:", subscriptions);
 
     if (!subscriptions || subscriptions.length === 0) {
-      return Response.json({ message: "No subscriptions" });
+      return Response.json({ message: "No subscriptions to notify" });
     }
 
     for (const sub of subscriptions) {
@@ -72,7 +81,6 @@ export async function GET() {
     return Response.json({ success: true });
 
   } catch (e) {
-    // ✅ 予期しないエラーもここでキャッチしてResponseを返す
     console.error("予期しないエラー:", e);
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }

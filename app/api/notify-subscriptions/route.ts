@@ -27,7 +27,7 @@ export async function GET() {
 
   if (!user?.is_pro) {
     console.log("無料プランなので通知しません");
-    return;
+    return Response.json({ message: "Free plan, skipping notification" });
   }
 
   const { data: subscriptions} = await supabase

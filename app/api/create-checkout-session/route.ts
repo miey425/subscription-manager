@@ -1,5 +1,5 @@
-import Stripe from "stripe";
 import { headers } from "next/headers";
+import { createStripeClient } from "@/lib/billing";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const priceId = process.env.STRIPE_PRICE_ID;
@@ -8,7 +8,7 @@ if (!stripeSecretKey) {
   throw new Error("Missing STRIPE_SECRET_KEY env var");
 }
 
-const stripe = new Stripe(stripeSecretKey);
+const stripe = createStripeClient();
 
 export async function POST(req: Request) {
   if (!priceId) {
@@ -46,6 +46,15 @@ export async function POST(req: Request) {
           quantity: 1,
         },
       ],
+      ...(userId
+        ? {
+            subscription_data: {
+              metadata: {
+                user_id: userId,
+              },
+            },
+          }
+        : {}),
       success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/cancel`,
       ...(userId ? { metadata: { user_id: userId } } : {}),

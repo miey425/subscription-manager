@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 
 interface Subscription {
   id: string;
@@ -19,12 +19,16 @@ export default function Home() {
   const [renewalDate, setRenewalDate] = useState("");
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isPro, setIsPro] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchSubscriptions = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+
+    if (!user) {
+      return;
+    }
 
     const { data, error } = await supabase
       .from("subscriptions")
@@ -36,20 +40,30 @@ export default function Home() {
     }
   };
 
-  const [loading, setLoading] = useState(true);
+  const refreshProStatus = async (userId: string) => {
+    const { data } = await supabase
+      .from("users")
+      .select("is_pro")
+      .eq("id", userId)
+      .single();
+
+    setIsPro(Boolean(data?.is_pro));
+  };
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         window.location.href = "/login";
         return;
       }
 
-      // Ensure users row exists (bypasses RLS via server route)
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
+
       if (accessToken) {
         await fetch("/api/ensure-user", {
           method: "POST",
@@ -57,15 +71,7 @@ export default function Home() {
         });
       }
 
-      const { data } = await supabase
-        .from("users")
-        .select("is_pro")
-        .eq("id", user.id)
-        .single();
-
-      const isPro = data?.is_pro;
-      setIsPro(Boolean(isPro));
-
+      await refreshProStatus(user.id);
       await fetchSubscriptions();
       setLoading(false);
     };
@@ -84,7 +90,7 @@ export default function Home() {
 
     if (!canAddSubscription) {
       alert(
-        "無料プランではサブスクリプションは3件まで登録できます。Proにアップグレードすると無制限に登録できます。"
+        "無料プランは3件まで登録できます。PROにアップグレードすると制限なく登録できます。"
       );
       return;
     }
@@ -103,27 +109,26 @@ export default function Home() {
     if (error) {
       console.error(error);
       alert("Failed to add subscription");
-    } else {
-      setName("");
-      setPrice("");
-      setBillingCycle("monthly");
-      setRenewalDate("");
-      fetchSubscriptions();
+      return;
     }
+
+    setName("");
+    setPrice("");
+    setBillingCycle("monthly");
+    setRenewalDate("");
+    fetchSubscriptions();
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from("subscriptions")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("subscriptions").delete().eq("id", id);
 
     if (error) {
       console.error(error);
       alert("削除に失敗しました");
-    } else {
-      fetchSubscriptions();
+      return;
     }
+
+    fetchSubscriptions();
   };
 
   const handleUpgrade = async () => {
@@ -136,20 +141,54 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user?.id ?? null }),
     });
-  
+
     if (!res.ok) {
       const text = await res.text();
       console.error("API error", res.status, text);
+      alert("チェックアウトを開始できませんでした");
       return;
     }
-  
+
     const data = await res.json();
     if (!data?.url) {
       console.error("Missing checkout url", data);
+      alert("チェックアウトURLの取得に失敗しました");
       return;
     }
 
     window.location.href = data.url;
+  };
+
+  const handleManageBilling = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const res = await fetch("/api/create-billing-portal-session", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.url) {
+      console.error("Failed to open billing portal", data);
+      alert("課金設定ページを開けませんでした");
+      return;
+    }
+
+    window.location.href = data.url;
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
   };
 
   const getNextRenewalDate = (sub: Subscription) => {
@@ -170,32 +209,24 @@ export default function Home() {
   const getRemainingDays = (sub: Subscription) => {
     const today = new Date();
     const nextRenewal = getNextRenewalDate(sub);
-
     const diffTime = nextRenewal.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    return diffDays;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   const monthlyTotal = subscriptions.reduce((sum, sub) => {
-    const price = Number(sub.price) || 0;
-    return sum + (sub.billing_cycle === "yearly" ? price / 12 : price);
+    const currentPrice = Number(sub.price) || 0;
+    return sum + (sub.billing_cycle === "yearly" ? currentPrice / 12 : currentPrice);
   }, 0);
 
   const yearlyTotal = subscriptions.reduce((sum, sub) => {
-    const price = Number(sub.price) || 0;
-    return sum + (sub.billing_cycle === "monthly" ? price * 12 : price);
+    const currentPrice = Number(sub.price) || 0;
+    return sum + (sub.billing_cycle === "monthly" ? currentPrice * 12 : currentPrice);
   }, 0);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex justify-center">
       <div className="w-full max-w-xl px-8 py-16">
-        {/* タイトル */}
         <h1 className="text-lg font-medium tracking-tight text-gray-900">
           Subscriptions
         </h1>
@@ -208,21 +239,29 @@ export default function Home() {
         </button>
 
         {isPro ? (
-          <div className="text-sm text-gray-600">⭐ Pro</div>
+          <div className="mt-3 flex items-center gap-3">
+            <div className="text-sm text-gray-600">Pro</div>
+            <button
+              type="button"
+              onClick={handleManageBilling}
+              className="text-xs text-gray-400 hover:text-black"
+            >
+              Manage billing / 解約
+            </button>
+          </div>
         ) : (
-          <button onClick={handleUpgrade}>
-            ⭐ Upgrade to Pro ($200/month)
+          <button onClick={handleUpgrade} className="mt-3 text-sm hover:underline">
+            Upgrade to Pro ($200/month)
           </button>
         )}
 
-        {/* フォーム */}
-        <form onSubmit={handleSubmit} className="space-y-4 mb-12">
+        <form onSubmit={handleSubmit} className="mb-12 space-y-4">
           <input
             type="text"
             placeholder="Service name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
+            className="w-full border-b border-gray-300 bg-transparent py-2 outline-none transition focus:border-black"
             required
           />
 
@@ -231,7 +270,7 @@ export default function Home() {
             placeholder="Price"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="w-full border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
+            className="w-full border-b border-gray-300 bg-transparent py-2 outline-none transition focus:border-black"
             required
           />
 
@@ -239,22 +278,19 @@ export default function Home() {
             <select
               value={billingCycle}
               onChange={(e) => setBillingCycle(e.target.value)}
-              className="border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
+              className="border-b border-gray-300 bg-transparent py-2 outline-none transition focus:border-black"
             >
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
             </select>
 
             <div className="flex flex-col">
-              <label className="text-sm text-gray-500">
-                Payment Date
-              </label>
-
+              <label className="text-sm text-gray-500">Payment Date</label>
               <input
                 type="date"
                 value={renewalDate}
                 onChange={(e) => setRenewalDate(e.target.value)}
-                className="w-full border-b border-gray-300 bg-transparent py-2 outline-none focus:border-black transition"
+                className="w-full border-b border-gray-300 bg-transparent py-2 outline-none transition focus:border-black"
                 required
               />
             </div>
@@ -267,7 +303,7 @@ export default function Home() {
             className={`text-sm transition ${
               canAddSubscription
                 ? "text-gray-600 hover:text-black"
-                : "text-gray-300 cursor-not-allowed"
+                : "cursor-not-allowed text-gray-300"
             }`}
           >
             + Add Subscription
@@ -280,31 +316,22 @@ export default function Home() {
           ) : null}
         </form>
 
-        <div className="mb-10 space-y-5 w-full max-w-xs mx-auto">
-          {/* 月額合計 */}
+        <div className="mx-auto mb-10 w-full max-w-xs space-y-5">
           <div className="flex items-baseline justify-between gap-4">
             <div className="text-sm text-gray-600">Monthly total</div>
-            <div
-              className="text-2xl font-semibold tracking-tight
-                  transition-all duration-300"
-            >
+            <div className="text-2xl font-semibold tracking-tight transition-all duration-300">
               ¥{Math.round(monthlyTotal).toLocaleString()}
             </div>
           </div>
 
-          {/* 年間合計 */}
           <div className="flex items-baseline justify-between gap-4">
             <div className="text-sm text-gray-600">Yearly total</div>
-            <div
-              className="text-2xl font-semibold tracking-tight
-                  transition-all duration-300"
-            >
+            <div className="text-2xl font-semibold tracking-tight transition-all duration-300">
               ¥{yearlyTotal.toLocaleString()}
             </div>
           </div>
         </div>
 
-        {/* 一覧 */}
         <ul className="space-y-6">
           <AnimatePresence>
             {subscriptions.map((sub) => {
@@ -319,7 +346,7 @@ export default function Home() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                   layout
-                  className="flex justify-between items-center py-4"
+                  className="flex items-center justify-between py-4"
                 >
                   <div className="space-y-1">
                     <div className="text-sm font-medium">{sub.name}</div>
@@ -334,15 +361,13 @@ export default function Home() {
                         isUrgent ? "text-red-500" : "text-gray-400"
                       }`}
                     >
-                      {remainingDays <= 0
-                        ? "Due"
-                        : `${remainingDays} days left`}
+                      {remainingDays <= 0 ? "Due" : `${remainingDays} days left`}
                     </div>
                   </div>
 
                   <button
                     onClick={() => handleDelete(sub.id)}
-                    className="text-xs text-gray-400 hover:text-black transition"
+                    className="text-xs text-gray-400 transition hover:text-black"
                   >
                     Remove
                   </button>

@@ -13,9 +13,12 @@ export function SuccessClient() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      return;
+    }
 
     let cancelled = false;
+
     const run = async () => {
       setStatus("confirming");
       setMessage(null);
@@ -27,7 +30,9 @@ export function SuccessClient() {
       });
 
       const text = await res.text();
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
 
       if (!res.ok) {
         setStatus("error");
@@ -40,21 +45,22 @@ export function SuccessClient() {
     };
 
     run();
+
     return () => {
       cancelled = true;
     };
   }, [sessionId]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center">
       <div className="w-80 space-y-4">
-        <h1 className="text-lg font-medium">支払いありがとうございます！</h1>
+        <h1 className="text-lg font-medium">決済ありがとうございます</h1>
 
         {sessionId ? (
           <p className="text-sm text-gray-500">
-            {status === "confirming" && "反映中..."}
-            {status === "confirmed" && "Pro が有効になりました。"}
-            {status === "error" && "反映に失敗しました。"}
+            {status === "confirming" && "購入内容を確認しています..."}
+            {status === "confirmed" && "PROプランを有効化しました。"}
+            {status === "error" && "有効化処理に失敗しました。"}
           </p>
         ) : (
           <p className="text-sm text-gray-500">
@@ -63,7 +69,7 @@ export function SuccessClient() {
         )}
 
         {message ? (
-          <pre className="text-xs text-red-600 whitespace-pre-wrap wrap-break-word">
+          <pre className="wrap-break-word whitespace-pre-wrap text-xs text-red-600">
             {message}
           </pre>
         ) : null}
@@ -75,4 +81,3 @@ export function SuccessClient() {
     </div>
   );
 }
-
